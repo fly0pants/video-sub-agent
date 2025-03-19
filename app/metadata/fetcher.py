@@ -3,6 +3,7 @@ import logging
 import requests
 import tmdbsimple as tmdb
 import json
+from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -237,167 +238,136 @@ class OMDBFetcher:
 class MetadataFetcher:
     """Main class for fetching metadata from various sources"""
     
-    def __init__(self, tmdb_api_key=None, omdb_api_key=None):
-        """
-        Initialize with API keys
+    def __init__(self):
+        self.tmdb_api_key = os.getenv('TMDB_API_KEY')
+        self.omdb_api_key = os.getenv('OMDB_API_KEY')
         
-        Args:
-            tmdb_api_key: TMDB API key
-            omdb_api_key: OMDb API key
-        """
-        self.fetchers = {}
+        if not self.tmdb_api_key:
+            raise ValueError("TMDB_API_KEY environment variable is not set")
+        if not self.omdb_api_key:
+            raise ValueError("OMDB_API_KEY environment variable is not set")
         
-        # Initialize TMDB fetcher if API key is provided
-        if tmdb_api_key or os.environ.get("TMDB_API_KEY"):
-            self.fetchers["tmdb"] = TMDBFetcher(api_key=tmdb_api_key)
-        
-        # Initialize OMDb fetcher if API key is provided
-        if omdb_api_key or os.environ.get("OMDB_API_KEY"):
-            self.fetchers["omdb"] = OMDBFetcher(api_key=omdb_api_key)
-    
-    def fetch_metadata(self, title, sources=None, is_tv=False, year=None):
-        """
-        Fetch metadata from specified sources
-        
-        Args:
-            title: Movie or TV show title
-            sources: List of sources to fetch from (e.g., ["tmdb", "omdb"])
-            is_tv: Whether the title is a TV show
-            year: Optional year to filter results
+        tmdb.API_KEY = self.tmdb_api_key
+
+    def search_tmdb(self, title: str) -> Optional[Dict[str, Any]]:
+        try:
+            search = tmdb.Search()
+            response = search.movie(query=title)
             
-        Returns:
-            Dictionary of metadata from each source
-        """
-        if not self.fetchers:
-            raise ValueError("No metadata fetchers initialized. Provide API keys.")
-        
-        # If sources not specified, use all available fetchers
-        sources = sources or list(self.fetchers.keys())
-        
-        results = {}
-        
-        for source in sources:
-            if source not in self.fetchers:
-                logger.warning(f"Metadata source '{source}' not available. Skipping.")
-                continue
+            if not response['results']:
+                return None
             
-            try:
-                if source == "tmdb":
-                    data = self.fetchers[source].get_metadata(title, is_tv=is_tv, year=year)
-                elif source == "omdb":
-                    data = self.fetchers[source].get_by_title(title, year=year)
-                else:
-                    logger.warning(f"Unknown source '{source}'. Skipping.")
-                    continue
+            # Get the first (most relevant) result
+            movie_id = response['results'][0]['id']
+            
+            # Get detailed movie info
+            movie = tmdb.Movies(movie_id)
+            info = movie.info()
+            credits = movie.credits()
+            
+            # Extract relevant information
+            result = {
+                'title': info['title'],
+                'original_title': info['original_title'],
+                'release_date': info['release_date'],
+                'runtime': info['runtime'],
+                'overview': info['overview'],
+                'poster_path': info['poster_path'],
+                'tmdb_id': str(info['id']),
+                'imdb_id': info.get('imdb_id'),
+                'genres': [genre['name'] for genre in info['genres']],
+                'actors': [
+                    {
+                        'name': cast['name'],
+                        'profile_path': cast['profile_path']
+                    }
+                    for cast in credits['cast'][:10]  # Get top 10 actors
+                ]
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching metadata from TMDB: {str(e)}")
+            return None
+
+    def search_omdb(self, title: str) -> Optional[Dict[str, Any]]:
+        try:
+            # Search OMDB API
+            url = f"http://www.omdbapi.com/?apikey={self.omdb_api_key}&t={title}"
+            response = requests.get(url)
+            data = response.json()
+            
+            if data.get('Response') == 'False':
+                return None
+            
+            # Extract relevant information
+            result = {
+                'title': data.get('Title'),
+                'release_date': data.get('Released'),
+                'runtime': self._parse_runtime(data.get('Runtime', '0 min')),
+                'overview': data.get('Plot'),
+                'poster_path': data.get('Poster'),
+                'imdb_id': data.get('imdbID'),
+                'genres': [genre.strip() for genre in data.get('Genre', '').split(',') if genre.strip()],
+                'actors': [
+                    {'name': actor.strip(), 'profile_path': None}
+                    for actor in data.get('Actors', '').split(',')
+                    if actor.strip()
+                ]
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error fetching metadata from OMDB: {str(e)}")
+            return None
+
+    def _parse_runtime(self, runtime_str: str) -> int:
+        """Convert OMDB runtime string to minutes"""
+        try:
+            return int(runtime_str.split()[0])
+        except (IndexError, ValueError):
+            return 0
+
+    def merge_metadata(self, tmdb_data: Optional[Dict], omdb_data: Optional[Dict]) -> Optional[Dict]:
+        """Merge metadata from multiple sources, preferring TMDB data"""
+        if not tmdb_data and not omdb_data:
+            return None
+            
+        # Start with TMDB data if available
+        if tmdb_data:
+            result = tmdb_data.copy()
+            
+            # Add/update with OMDB data if available
+            if omdb_data:
+                # Use OMDB data only for missing fields
+                for key in ['overview', 'runtime']:
+                    if not result.get(key) and omdb_data.get(key):
+                        result[key] = omdb_data[key]
                 
-                if data:
-                    results[source] = data
-            except Exception as e:
-                logger.error(f"Error fetching metadata from {source}: {e}")
-        
-        return results
-    
-    def extract_common_metadata(self, metadata):
-        """
-        Extract common metadata fields from various sources
-        
-        Args:
-            metadata: Dictionary of metadata from different sources
-            
-        Returns:
-            Dictionary of common metadata fields
-        """
-        common = {
-            "title": None,
-            "year": None,
-            "genres": [],
-            "actors": [],
-            "directors": [],
-            "plot": None,
-            "poster_url": None,
-            "rating": None
-        }
-        
-        # Extract from TMDB if available
-        if "tmdb" in metadata:
-            tmdb_data = metadata["tmdb"]
-            
-            common["title"] = tmdb_data.get("title") or tmdb_data.get("name")
-            
-            # Extract year from release_date or first_air_date
-            release_date = tmdb_data.get("release_date") or tmdb_data.get("first_air_date")
-            if release_date and len(release_date) >= 4:
-                common["year"] = release_date[:4]
-            
-            # Extract genres
-            if "genres" in tmdb_data:
-                common["genres"] = [genre["name"] for genre in tmdb_data["genres"]]
-            
-            # Extract actors and directors from credits
-            if "credits" in tmdb_data:
-                # Get top actors
-                cast = tmdb_data["credits"].get("cast", [])
-                common["actors"] = [person["name"] for person in cast[:10]]  # Top 10 actors
+                # Merge genres
+                if omdb_data.get('genres'):
+                    existing_genres = set(result.get('genres', []))
+                    for genre in omdb_data['genres']:
+                        if genre not in existing_genres:
+                            result.setdefault('genres', []).append(genre)
                 
-                # Get directors (for movies)
-                crew = tmdb_data["credits"].get("crew", [])
-                common["directors"] = [person["name"] for person in crew if person.get("job") == "Director"]
+                # Merge actors
+                if omdb_data.get('actors'):
+                    existing_actors = {actor['name'] for actor in result.get('actors', [])}
+                    for actor in omdb_data['actors']:
+                        if actor['name'] not in existing_actors:
+                            result.setdefault('actors', []).append(actor)
             
-            common["plot"] = tmdb_data.get("overview")
+            return result
             
-            # Create poster URL
-            if tmdb_data.get("poster_path"):
-                common["poster_url"] = f"https://image.tmdb.org/t/p/w500{tmdb_data['poster_path']}"
-            
-            common["rating"] = tmdb_data.get("vote_average")
+        # If no TMDB data, use OMDB data
+        return omdb_data
+
+    def fetch_metadata(self, title: str) -> Optional[Dict[str, Any]]:
+        """Fetch and merge metadata from all available sources"""
+        tmdb_data = self.search_tmdb(title)
+        omdb_data = self.search_omdb(title)
         
-        # Extract from OMDb if available
-        if "omdb" in metadata:
-            omdb_data = metadata["omdb"]
-            
-            # Only use OMDb data if TMDB data not available
-            if not common["title"]:
-                common["title"] = omdb_data.get("Title")
-            
-            if not common["year"]:
-                year_str = omdb_data.get("Year")
-                if year_str and "–" in year_str:  # TV series with range
-                    common["year"] = year_str.split("–")[0]
-                else:
-                    common["year"] = year_str
-            
-            if not common["genres"]:
-                genres_str = omdb_data.get("Genre")
-                if genres_str:
-                    common["genres"] = [g.strip() for g in genres_str.split(",")]
-            
-            if not common["actors"]:
-                actors_str = omdb_data.get("Actors")
-                if actors_str:
-                    common["actors"] = [a.strip() for a in actors_str.split(",")]
-            
-            if not common["directors"]:
-                directors_str = omdb_data.get("Director")
-                if directors_str and directors_str != "N/A":
-                    common["directors"] = [d.strip() for d in directors_str.split(",")]
-            
-            if not common["plot"]:
-                common["plot"] = omdb_data.get("Plot")
-            
-            if not common["poster_url"]:
-                poster = omdb_data.get("Poster")
-                if poster and poster != "N/A":
-                    common["poster_url"] = poster
-            
-            if not common["rating"]:
-                # Try to get IMDb rating
-                ratings = omdb_data.get("Ratings", [])
-                for rating in ratings:
-                    if rating["Source"] == "Internet Movie Database":
-                        try:
-                            common["rating"] = float(rating["Value"].split("/")[0])
-                            break
-                        except (ValueError, IndexError):
-                            pass
-        
-        return common 
+        return self.merge_metadata(tmdb_data, omdb_data) 

@@ -1,7 +1,7 @@
-from .models import Video, Subtitle, Metadata, Genre, Actor, init_db
+from .models import Video, Subtitle, MovieInfo, Genre, Actor, init_db
 from .operations import DatabaseOperations
 
 __all__ = [
-    'Video', 'Subtitle', 'Metadata', 'Genre', 'Actor', 
+    'Video', 'Subtitle', 'MovieInfo', 'Genre', 'Actor', 
     'init_db', 'DatabaseOperations'
 ] 
