@@ -1,0 +1,29 @@
+title: Video Sub Agent
+description: A powerful video analysis and metadata management system
+theme: jekyll-theme-cayman
+
+# Language settings
+languages: ["en", "zh"]
+default_lang: "en"
+exclude_from_localization: ["assets", "images"]
+parallel_localization: true
+
+# Navigation
+nav:
+  en:
+    home: "Home"
+    features: "Features"
+    installation: "Installation"
+    usage: "Usage"
+    development: "Development"
+  zh:
+    home: "首页"
+    features: "功能特点"
+    installation: "安装说明"
+    usage: "使用方法"
+    development: "开发计划"
+
+# Site settings
+url: "https://fly0pants.github.io"
+baseurl: "/video-sub-agent"
+repository: fly0pants/video-sub-agent
