@@ -37,10 +37,7 @@ async def startup_db_client():
         app.state.db_operations = DatabaseOperations(db_engine)
         
         # Initialize video processor
-        app.state.video_processor = VideoProcessor(
-            db_operations=app.state.db_operations,
-            config=CONFIG
-        )
+        app.state.video_processor = VideoProcessor()
         
         # Create output and upload directories if they don't exist
         os.makedirs(CONFIG["output_dir"], exist_ok=True)

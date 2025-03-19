@@ -33,6 +33,25 @@ if missing_vars:
 API_HOST = os.getenv('API_HOST', '0.0.0.0')
 API_PORT = int(os.getenv('API_PORT', '8000'))
 
+# Create CONFIG dictionary for app configuration
+CONFIG = {
+    "database_url": DATABASE_URL,
+    "output_dir": OUTPUT_DIR,
+    "upload_dir": UPLOAD_DIR,
+    "deepseek_api_key": DEEPSEEK_API_KEY,
+    "deepseek_api_base": os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com/v1'),
+    "deepseek_model": os.getenv('DEEPSEEK_MODEL', 'deepseek-chat'),
+    "tmdb_api_key": TMDB_API_KEY,
+    "omdb_api_key": OMDB_API_KEY,
+    "opensubtitles_api_key": os.getenv('OPENSUBTITLES_API_KEY'),
+    "subtitle_output_dir": os.getenv('SUBTITLE_OUTPUT_DIR', 'output/subtitles'),
+    "temp_dir": os.getenv('TEMP_DIR', 'temp'),
+    "batch_size": int(os.getenv('BATCH_SIZE', '10')),
+    "max_workers": int(os.getenv('MAX_WORKERS', '4')),
+    "api_host": API_HOST,
+    "api_port": API_PORT
+}
+
 # Logging configuration
 def setup_logging():
     logging.basicConfig(

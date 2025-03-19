@@ -100,18 +100,39 @@ If you're not confident, respond with just 'Unknown'."""},
         Returns:
             Official movie name as recognized by LLM
         """
-        # Extract just the filename without extension if a path is given
+        # Extract the full path information
+        full_path = filename
+        
+        # Analyze the parent directory structure for clues about the movie
+        parent_dirs = []
         if os.path.sep in filename:
+            parent_dir = os.path.dirname(filename)
+            path_parts = parent_dir.split(os.path.sep)
+            # Get last 2 directory names if available
+            parent_dirs = path_parts[-2:] if len(path_parts) >= 2 else path_parts
+            
+            # Extract just the filename
             filename = os.path.basename(filename)
         
         # Remove file extension if present
         name_without_ext = os.path.splitext(filename)[0]
         
-        # Construct prompt for LLM
-        prompt = f"""The filename of a video is '{name_without_ext}'. 
+        # Construct improved prompt for LLM that includes path information
+        prompt = f"""I need to identify the official movie name from a video file.
+Full path: '{full_path}'
+Filename: '{name_without_ext}'
+"""
+        
+        # Add parent directory information if available
+        if parent_dirs:
+            parent_dirs_str = " > ".join(parent_dirs)
+            prompt += f"Parent directories: '{parent_dirs_str}'\n"
+            
+        prompt += """
 Please identify the official full name of this movie or TV show.
+If it's a Chinese, Japanese or other non-English movie, provide both the original name and the official English name.
 If it's a TV show, include the season and episode number if present.
-Just provide the official name, no explanations or other text."""
+Just provide the official name(s), no explanations or other text."""
         
         try:
             # Call the LLM API
@@ -124,11 +145,11 @@ Just provide the official name, no explanations or other text."""
                 json={
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": "You are a movie name recognition expert. Your task is to identify the official movie name from potentially non-standard filenames."},
+                        {"role": "system", "content": "You are a movie name recognition expert. Your task is to identify the official movie name from file information. Pay attention to the directory structure as it often contains important information about the movie, especially for foreign films."},
                         {"role": "user", "content": prompt}
                     ],
                     "temperature": 0.3,
-                    "max_tokens": 50
+                    "max_tokens": 100
                 }
             )
             

@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional, List
 from .database.manager import DatabaseManager
 from .subtitle import SubtitleExtractor
 from .metadata import MetadataManager
+from .movie_name.recognizer import MovieNameRecognizer
 from .log import logger
 
 class VideoProcessor:
@@ -13,6 +14,7 @@ class VideoProcessor:
         self.db_manager = DatabaseManager()
         self.subtitle_extractor = SubtitleExtractor()
         self.metadata_manager = MetadataManager()
+        self.movie_name_recognizer = MovieNameRecognizer()
 
     def _fetch_subtitles_from_web(self, video_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -222,21 +224,49 @@ class VideoProcessor:
             if self.db_manager.is_video_processed(video_path):
                 logger.info(f"Video already processed: {video_path}")
                 return self.db_manager.get_video_info(video_path)
+            
+            # Initialize movie name recognition
+            file_basename = os.path.basename(video_path)
+            logger.info(f"Processing video: {file_basename}")
+            
+            # Get movie name using the improved movie name recognizer
+            # This will analyze the full path including parent directories
+            try:
+                movie_name = self.movie_name_recognizer.recognize_movie_name(video_path)
+                logger.info(f"Recognized movie name: {movie_name}")
+            except Exception as e:
+                logger.error(f"Failed to recognize movie name using AI: {str(e)}")
+                # Fallback: Get movie name from parent directory and filename
+                parent_dir = os.path.basename(os.path.dirname(video_path))
+                movie_name = parent_dir.split("[")[0].strip()
                 
-            # Get movie name from parent directory
-            parent_dir = os.path.basename(os.path.dirname(video_path))
-            movie_name = parent_dir.split("[")[0].strip()
-            logger.info(f"Processing video: {movie_name}")
+                # If parent directory doesn't provide a good name, use filename
+                if len(movie_name) < 2:
+                    movie_name = os.path.splitext(file_basename)[0].split("[")[0].strip()
+                
+                logger.info(f"Using fallback movie name extraction: {movie_name}")
             
             # Get metadata
             metadata = self.metadata_manager.fetch_metadata(movie_name)
             if metadata:
                 logger.info(f"Found metadata for movie: {metadata.get('title')}")
             else:
-                # Try to get English title from parent directory
+                # Try to get year from directory or filename
                 year = None
+                # Check parent directory for year in brackets
+                parent_dir = os.path.basename(os.path.dirname(video_path))
                 if "[" in parent_dir and "]" in parent_dir:
                     parts = parent_dir.split("[")
+                    for part in parts[1:]:
+                        if part.endswith("]"):
+                            year_str = part[:-1]
+                            if year_str.isdigit() and len(year_str) == 4:
+                                year = int(year_str)
+                                break
+                
+                # If year not found in parent dir, check filename
+                if not year and "[" in file_basename and "]" in file_basename:
+                    parts = file_basename.split("[")
                     for part in parts[1:]:
                         if part.endswith("]"):
                             year_str = part[:-1]
@@ -248,7 +278,7 @@ class VideoProcessor:
                     logger.info(f"Trying to fetch metadata with year: {year}")
                     metadata = self.metadata_manager.fetch_metadata(movie_name, year=year)
                     if metadata:
-                        logger.info(f"Found metadata for movie: {metadata.get('title')}")
+                        logger.info(f"Found metadata with year for movie: {metadata.get('title')}")
                     else:
                         logger.warning(f"No metadata found for movie: {movie_name}")
                 else:

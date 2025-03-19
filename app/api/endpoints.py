@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import os
@@ -19,16 +19,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Dependency to get database operations
-def get_db_operations():
-    # This would typically get the db_operations from the app state
-    # For now, just return a placeholder
-    return None
+def get_db_operations(request: Request):
+    return request.app.state.db_operations
 
 # Dependency to get video processor
-def get_video_processor():
-    # This would typically get the processor from the app state
-    # For now, just return a placeholder
-    return None
+def get_video_processor(request: Request):
+    return request.app.state.video_processor
 
 @router.get("/videos", response_model=VideosResponse)
 def list_videos(
@@ -63,8 +59,7 @@ def process_video(
         
         # Process the video (can be moved to background task for long processing)
         result = video_processor.process_video(
-            video_path=request.video_path,
-            extract_hardcoded=request.extract_hardcoded
+            video_path=request.video_path
         )
         
         return result
@@ -115,8 +110,7 @@ async def upload_and_process_video(
         
         # Process the video (can be moved to background task for long processing)
         result = video_processor.process_video(
-            video_path=file_path,
-            extract_hardcoded=extract_hardcoded
+            video_path=file_path
         )
         
         return result

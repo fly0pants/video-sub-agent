@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine
+import click
 
 from .database import init_db
 from .database.operations import DatabaseOperations
 from .processor import VideoProcessor
 from .movie_name import MovieNameRecognizer
 from config.settings import setup_logging
+from .log import logger
 
 # Set up logging
 logger = setup_logging()
@@ -21,13 +23,18 @@ def get_db_session() -> Session:
     SessionLocal = sessionmaker(bind=engine)
     return SessionLocal()
 
-def process_video(file_path: str, db_ops: DatabaseOperations, processor: VideoProcessor) -> bool:
+def process_video(file_path: str, db_ops: DatabaseOperations, processor: VideoProcessor, force: bool = False) -> bool:
     try:
         # Check if video already exists in database
         existing_video = db_ops.get_video_by_path(file_path)
-        if existing_video:
+        if existing_video and not force:
             logger.info(f"Video already processed: {file_path}")
             return True
+            
+        # If force flag is set and video exists, delete it first
+        if existing_video and force:
+            logger.info(f"Force flag set, reprocessing video: {file_path}")
+            db_ops.delete_video(existing_video.id)
 
         # Process the video
         result = processor.process_video(file_path)
@@ -119,6 +126,7 @@ def parse_args():
     # Process single video
     process_parser = subparsers.add_parser('process', help='Process a single video')
     process_parser.add_argument('file_path', help='Path to the video file')
+    process_parser.add_argument('--force', '-f', action='store_true', help='Force reprocessing even if video is already processed')
 
     # Delete video
     delete_parser = subparsers.add_parser('delete', help='Delete a video from the database')
@@ -148,8 +156,8 @@ def main():
         db_ops = DatabaseOperations(session)
         
         if args.command == 'process':
-            processor = VideoProcessor(db_ops)
-            success = process_video(args.file_path, db_ops, processor)
+            processor = VideoProcessor()
+            success = process_video(args.file_path, db_ops, processor, args.force)
             return 0 if success else 1
             
         elif args.command == 'delete':
@@ -157,7 +165,7 @@ def main():
             return 0 if success else 1
         
         elif args.command == 'batch':
-            processor = VideoProcessor(db_ops)
+            processor = VideoProcessor()
             batch_process_videos(args.directory, db_ops, processor)
             return 0
         
@@ -174,6 +182,93 @@ def main():
         return 1
     finally:
         session.close()
+
+@click.group()
+def cli():
+    """Video subtitle extraction and management tool."""
+    pass
+
+@cli.command()
+@click.argument("video_path", type=click.Path(exists=True))
+@click.option("--force", "-f", is_flag=True, help="Force reprocessing even if video was already processed")
+def process(video_path: str, force: bool = False):
+    """Process a video file to extract subtitles and metadata."""
+    processor = VideoProcessor()
+    
+    # Check if video already exists and force flag is not set
+    if not force and processor.db_manager.is_video_processed(video_path):
+        logger.info(f"Video already processed: {video_path}")
+        return
+        
+    # If force flag is set and video exists, delete it first
+    if force and processor.db_manager.is_video_processed(video_path):
+        logger.info(f"Force flag set, reprocessing video: {video_path}")
+        processor.db_manager.delete_video(video_path)
+    
+    result = processor.process_video(video_path)
+    
+    if "error" in result:
+        logger.error(f"Failed to process video: {result['error']}")
+        return
+        
+    logger.info("Video processing completed successfully:")
+    logger.info(f"  File: {result['file_path']}")
+    logger.info(f"  Name: {result['official_name']}")
+    
+    if result['subtitle_info'].get('subtitles'):
+        logger.info("  Subtitles:")
+        for sub in result['subtitle_info']['subtitles']:
+            logger.info(f"    - {sub['language']}: {sub['content_path']}")
+    else:
+        logger.info("  No subtitles found")
+    
+    if result['metadata']:
+        logger.info("  Metadata:")
+        logger.info(f"    Title: {result['metadata'].get('title')}")
+        logger.info(f"    Year: {result['metadata'].get('release_date', '').split('-')[0]}")
+        logger.info(f"    Genres: {', '.join(result['metadata'].get('genres', []))}")
+    else:
+        logger.info("  No metadata found")
+
+@cli.command()
+def list():
+    """List all processed videos."""
+    processor = VideoProcessor()
+    videos = processor.db_manager.list_videos()
+    
+    if not videos:
+        logger.info("No processed videos found")
+        return
+        
+    logger.info(f"Found {len(videos)} processed videos:")
+    for video in videos:
+        logger.info(f"\nFile: {video['file_path']}")
+        logger.info(f"Name: {video['official_name']}")
+        
+        if video['subtitle_info'].get('subtitles'):
+            logger.info("Subtitles:")
+            for sub in video['subtitle_info']['subtitles']:
+                logger.info(f"  - {sub['language']}: {sub['content_path']}")
+        else:
+            logger.info("No subtitles found")
+        
+        if video['metadata']:
+            logger.info("Metadata:")
+            logger.info(f"  Title: {video['metadata'].get('title')}")
+            logger.info(f"  Year: {video['metadata'].get('release_date', '').split('-')[0]}")
+            logger.info(f"  Genres: {', '.join(video['metadata'].get('genres', []))}")
+        else:
+            logger.info("No metadata found")
+
+@cli.command()
+@click.argument("video_path", type=click.Path(exists=True))
+def delete(video_path: str):
+    """Delete video information from database."""
+    processor = VideoProcessor()
+    if processor.db_manager.delete_video(video_path):
+        logger.info(f"Successfully deleted video info: {video_path}")
+    else:
+        logger.error(f"Failed to delete video info: {video_path}")
 
 if __name__ == '__main__':
     sys.exit(main()) 

@@ -83,8 +83,9 @@ class Actor(Base):
     
     videos = relationship("Video", secondary=video_actor, back_populates="actors")
 
-def init_db():
-    database_url = os.getenv('DATABASE_URL', 'sqlite:///./videos.db')
+def init_db(database_url=None):
+    if database_url is None:
+        database_url = os.getenv('DATABASE_URL', 'sqlite:///./videos.db')
     engine = create_engine(database_url)
     Base.metadata.create_all(engine)
     return engine 

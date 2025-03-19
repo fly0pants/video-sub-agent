@@ -1,0 +1,47 @@
+{
+  "videos": [
+    {
+      "path": "/Volumes/Lenovo/\u65e5\u672c\u52a8\u753b\u7535\u5f71\u3010\u53cc\u5b57\u5e55\u3011/\u9f99\u732b.mp4",
+      "name": "Original Name: \u3068\u306a\u308a\u306e\u30c8\u30c8\u30ed (Tonari no Totoro)  \nOfficial English Name: My Neighbor Totoro",
+      "status": "completed",
+      "metadata": {
+        "title": "My Neighbor Totoro",
+        "original_title": "\u3068\u306a\u308a\u306e\u30c8\u30c8\u30ed",
+        "release_date": "1988-04-16",
+        "runtime": 86,
+        "overview": "This acclaimed animated tale by director Hayao Miyazaki follows schoolgirl Satsuke and her younger sister, Mei, as they settle into an old country house with their father and wait for their mother to recover from an illness in an area hospital. As the sisters explore their new home, they encounter and befriend playful spirits in their house and the nearby forest, most notably the massive cuddly creature known as Totoro.",
+        "genres": [
+          "Animation",
+          "Family",
+          "Fantasy"
+        ],
+        "director": "Hayao Miyazaki",
+        "actors": [
+          "Hitoshi Takagi",
+          "Noriko Hidaka",
+          "Chika Sakamoto",
+          "Shigesato Itoi",
+          "Sumi Shimamoto",
+          "Tanie Kitabayashi",
+          "Hiroko Maruyama",
+          "Machiko Washio"
+        ],
+        "language": "Japanese",
+        "country": "Japan",
+        "imdb_id": "tt0096283",
+        "imdb_rating": 8.2
+      },
+      "subtitle_source": "web",
+      "subtitles": [
+        {
+          "language": "en",
+          "content_path": "output/subtitles/\u9f99\u732b_en.srt"
+        },
+        {
+          "language": "ja",
+          "content_path": "output/subtitles/\u9f99\u732b_ja.srt"
+        }
+      ]
+    }
+  ]
+}

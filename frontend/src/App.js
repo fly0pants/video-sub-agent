@@ -57,7 +57,7 @@ function App() {
         formData.append("extract_hardcoded", "false");
 
         const response = await axios.post(
-          "http://localhost:8000/api/videos/upload",
+          "http://localhost:8001/api/videos/upload",
           formData,
           {
             headers: {
@@ -83,7 +83,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:8000/api/recognize/name",
+        "http://localhost:8001/api/recognize/name",
         {
           name: movieName,
         }
