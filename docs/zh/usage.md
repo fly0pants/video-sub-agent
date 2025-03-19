@@ -105,7 +105,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## 字幕处理
 
-### 字幕格式
+### 字幕功能
 
 系统支持提取多种格式的字幕：
 
@@ -113,15 +113,25 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 - VTT（Web Video Text Tracks）
 - TXT（纯文本）
 
+### 多语言字幕支持
+
+系统现在支持下载多种语言的字幕：
+
+- 自动从元数据中检测电影的原始语言
+- 同时下载英文字幕和电影原始语言的字幕
+- 将常见语言名称映射为 ISO 639-1 代码（例如，"Korean" → "ko"）
+- 支持同一视频的多语言字幕
+
 ### 字幕位置
 
 提取的字幕存储在：
 
 ```
-output/subtitles/<video_hash>/
-  - subtitles.srt
-  - subtitles.vtt
-  - subtitles.txt
+output/subtitles/
+  - movie_name_en.srt  (英文字幕)
+  - movie_name_ko.srt  (韩文字幕)
+  - movie_name_zh.srt  (中文字幕)
+  - 等等
 ```
 
 ### 字幕处理功能

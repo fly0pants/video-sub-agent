@@ -105,7 +105,7 @@ A web interface is available for easy management of videos and subtitles.
 
 ## Working with Subtitles
 
-### Subtitle Formats
+### Subtitle Features
 
 The system extracts subtitles in multiple formats:
 
@@ -113,15 +113,25 @@ The system extracts subtitles in multiple formats:
 - VTT (Web Video Text Tracks)
 - TXT (Plain text)
 
+### Multi-language Subtitle Support
+
+The system now supports downloading subtitles in multiple languages:
+
+- Automatically detects the movie's original language from metadata
+- Downloads both English subtitles and the movie's original language subtitles
+- Maps common language names to ISO 639-1 codes (e.g., "Korean" → "ko")
+- Supports multiple language subtitles for the same video
+
 ### Subtitle Location
 
 Extracted subtitles are stored in:
 
 ```
-output/subtitles/<video_hash>/
-  - subtitles.srt
-  - subtitles.vtt
-  - subtitles.txt
+output/subtitles/
+  - movie_name_en.srt  (English subtitles)
+  - movie_name_ko.srt  (Korean subtitles)
+  - movie_name_zh.srt  (Chinese subtitles)
+  - etc.
 ```
 
 ### Subtitle Processing
